@@ -58,6 +58,26 @@ If you plan to distribute the executable, you can sign and notarize it:
 
 See [BUILD.md](BUILD.md) for detailed instructions.
 
+## Creating Releases
+
+To create a GitHub release with the built executable:
+
+1. Build the executable:
+   ```bash
+   ./build.sh
+   ```
+
+2. Create a release archive:
+   ```bash
+   ./create_release.sh v1.0.0 "Release notes here"
+   ```
+
+3. Create a GitHub release:
+   - Go to [GitHub Releases](https://github.com/cookiebinary1/keep-to-joplin/releases/new)
+   - Or use GitHub CLI: `gh release create v1.0.0 keep-to-joplin-v1.0.0-macos.zip --title "Release v1.0.0" --notes "Release notes"`
+
+The release archive will be created in the project root directory.
+
 ## Project Structure
 
 ```

@@ -2,6 +2,22 @@ import os
 import sys
 from typing import Optional
 
+# Suppress macOS Text Services Manager warnings
+class StderrFilter:
+    def __init__(self, original_stderr):
+        self.original_stderr = original_stderr
+    
+    def write(self, message):
+        if 'TSMSendMessageToUIServer' not in message:
+            self.original_stderr.write(message)
+    
+    def flush(self):
+        self.original_stderr.flush()
+
+# Redirect stderr to filter out macOS warnings
+if sys.platform == 'darwin':
+    sys.stderr = StderrFilter(sys.stderr)
+
 from PyQt6 import QtCore, QtWidgets
 
 from keep_to_joplin import convert_keep_notes
