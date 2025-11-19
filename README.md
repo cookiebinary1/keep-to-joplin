@@ -140,6 +140,40 @@ This will automatically:
 - Create release archives
 - Create a GitHub release with all platform builds
 
+## Contributing
+
+Contributions are welcome! However, please note that **all changes, modifications, and fixes require approval** before being merged.
+
+### How to Contribute
+
+1. **Fork the repository** and create a new branch for your changes
+2. **Make your changes** following the existing code style
+3. **Test your changes** to ensure they work correctly
+4. **Submit a Pull Request** with a clear description of what you changed and why
+
+### Contribution Guidelines
+
+- **Code Quality**: Ensure your code follows Python best practices and is well-documented
+- **Testing**: Test your changes on your platform before submitting
+- **Documentation**: Update relevant documentation if you add new features or change behavior
+- **Commit Messages**: Write clear, descriptive commit messages
+
+### Review Process
+
+All pull requests will be reviewed by the maintainer. The maintainer reserves the right to:
+- Request changes or clarifications
+- Modify or edit contributions before merging
+- Reject contributions that don't align with the project's goals
+
+**Note**: This is a personal project, and the maintainer will review and approve all contributions to ensure quality and consistency.
+
+### Reporting Issues
+
+If you find a bug or have a feature request, please open an issue on GitHub with:
+- A clear description of the problem or feature
+- Steps to reproduce (for bugs)
+- Your platform and Python version (if applicable)
+
 ## Project Structure
 
 ```
