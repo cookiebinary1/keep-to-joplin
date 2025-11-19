@@ -35,10 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-)
-app = BUNDLE(
-    exe,
-    name='keep_to_joplin.app',
-    icon=None,
-    bundle_identifier=None,
+    icon='NONE',
 )
