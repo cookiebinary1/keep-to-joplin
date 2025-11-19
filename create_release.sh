@@ -33,9 +33,9 @@ cd "$SCRIPT_DIR"
 if [ ! -d "dist" ]; then
     echo "Error: dist/ directory not found"
     echo "Run the appropriate build script first:"
-    echo "  - macOS: ./build.sh"
-    echo "  - Linux: ./build-linux.sh"
-    echo "  - Windows: build-windows.bat"
+    echo "  - macOS: ./build_macos.sh"
+    echo "  - Linux: ./build_linux.sh"
+    echo "  - Windows: build_windows.bat"
     exit 1
 fi
 
@@ -104,9 +104,9 @@ if [ ${#ARCHIVES[@]} -eq 0 ]; then
     ls -la dist/ 2>/dev/null || echo "  (empty or does not exist)"
     echo ""
     echo "Run the appropriate build script first:"
-    echo "  - macOS: ./build.sh"
-    echo "  - Linux: ./build-linux.sh"
-    echo "  - Windows: build-windows.bat"
+    echo "  - macOS: ./build_macos.sh"
+    echo "  - Linux: ./build_linux.sh"
+    echo "  - Windows: build_windows.bat"
     exit 1
 fi
 

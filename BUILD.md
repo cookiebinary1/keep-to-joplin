@@ -14,7 +14,7 @@ This document describes how to build a standalone GUI executable for macOS that 
 Use the provided build script:
 
 ```bash
-./build.sh
+./build_macos.sh
 ```
 
 This script will:

@@ -10,7 +10,7 @@ EXECUTABLE="dist/keep_to_joplin"
 
 if [ ! -f "$EXECUTABLE" ]; then
     echo "Error: Executable not found at $EXECUTABLE"
-    echo "Please run ./build.sh first"
+    echo "Please run ./build_macos.sh first"
     exit 1
 fi
 

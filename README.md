@@ -29,7 +29,7 @@ Migrating from Google Keep to [Joplin](https://joplinapp.org/) offers several si
 
 1. Build the executable:
    ```bash
-   ./build.sh
+   ./build_macos.sh
    ```
 
 2. Run the GUI:
@@ -54,17 +54,17 @@ The project includes platform-specific build scripts:
 
 ### macOS
 ```bash
-./build.sh
+./build_macos.sh
 ```
 
 ### Linux
 ```bash
-./build-linux.sh
+./build_linux.sh
 ```
 
 ### Windows
 ```cmd
-build-windows.bat
+build_windows.bat
 ```
 
 Each build script will:
@@ -100,13 +100,13 @@ To create a GitHub release with built executables for multiple platforms:
 1. Build executables for each platform:
    ```bash
    # On macOS
-   ./build.sh
+   ./build_macos.sh
    
    # On Linux
-   ./build-linux.sh
+   ./build_linux.sh
    
    # On Windows
-   build-windows.bat
+   build_windows.bat
    ```
 
 2. Create release archives (run on each platform, or copy dist/ from each):
@@ -146,10 +146,10 @@ This will automatically:
 .
 ├── keep_to_joplin.py      # CLI version
 ├── keep_to_joplin_gui.py  # GUI version
-├── build.sh               # Build script
+├── build_macos.sh         # Build script
 ├── test_gui.sh            # Test script
 ├── sign_and_notarize.sh   # Code signing helper
-├── .venv/                 # Virtual environment (created by build.sh)
+├── .venv/                 # Virtual environment (created by build_macos.sh)
 ├── dist/                   # Built executables
 └── build/                  # Build artifacts
 ```
