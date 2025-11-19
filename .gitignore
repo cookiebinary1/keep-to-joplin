@@ -34,3 +34,6 @@ Thumbs.db
 .rebase_script.sh
 
 keep-to-joplin.spec
+
+# Virtual environment
+.venv
