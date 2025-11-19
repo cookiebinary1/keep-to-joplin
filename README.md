@@ -29,16 +29,30 @@ python3 keep_to_joplin.py --input Takeout/Keep --output /path/to/output
 
 ## Building the Standalone Executable
 
-The project includes a build script that creates a standalone macOS executable:
+The project includes platform-specific build scripts:
 
+### macOS
 ```bash
 ./build.sh
 ```
 
-This will:
+### Linux
+```bash
+./build-linux.sh
+```
+
+### Windows
+```cmd
+build-windows.bat
+```
+
+Each build script will:
 - Create a `.venv` virtual environment (if needed)
 - Install PyInstaller and PyQt6
-- Build a standalone executable at `dist/keep_to_joplin`
+- Build a standalone executable in `dist/`
+  - macOS: `dist/keep_to_joplin.app`
+  - Linux: `dist/keep_to_joplin`
+  - Windows: `dist/keep_to_joplin.exe`
 
 ## Testing
 
@@ -60,23 +74,50 @@ See [BUILD.md](BUILD.md) for detailed instructions.
 
 ## Creating Releases
 
-To create a GitHub release with the built executable:
+To create a GitHub release with built executables for multiple platforms:
 
-1. Build the executable:
+1. Build executables for each platform:
    ```bash
+   # On macOS
    ./build.sh
+   
+   # On Linux
+   ./build-linux.sh
+   
+   # On Windows
+   build-windows.bat
    ```
 
-2. Create a release archive:
+2. Create release archives (run on each platform, or copy dist/ from each):
    ```bash
    ./create_release.sh v1.0.0 "Release notes here"
    ```
 
 3. Create a GitHub release:
-   - Go to [GitHub Releases](https://github.com/cookiebinary1/keep-to-joplin/releases/new)
-   - Or use GitHub CLI: `gh release create v1.0.0 keep-to-joplin-v1.0.0-macos.zip --title "Release v1.0.0" --notes "Release notes"`
+   ```bash
+   gh release create v1.0.0 \
+     keep-to-joplin-v1.0.0-macos.zip \
+     keep-to-joplin-v1.0.0-linux.zip \
+     keep-to-joplin-v1.0.0-windows.zip \
+     --title "Release v1.0.0" \
+     --notes "Release notes"
+   ```
 
-The release archive will be created in the project root directory.
+The `create_release.sh` script automatically detects which platform executables are available and creates archives for them.
+
+### Automated Builds (GitHub Actions)
+
+The project includes a GitHub Actions workflow that automatically builds executables for all platforms when you push a tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This will automatically:
+- Build executables for macOS, Linux, and Windows
+- Create release archives
+- Create a GitHub release with all platform builds
 
 ## Project Structure
 
