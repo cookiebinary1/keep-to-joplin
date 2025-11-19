@@ -25,10 +25,11 @@ import datetime
 import json
 import os
 import re
+import shutil
 import sys
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import List, Optional, Tuple
+from typing import List, Optional, Set, Tuple
 
 # --- HTML Stripper ---
 
@@ -75,6 +76,7 @@ class Note:
     labels: List[str] = field(default_factory=list)
     color: str = "DEFAULT"
     attachments: List[dict] = field(default_factory=list)
+    annotations: List[dict] = field(default_factory=list)
 
 
 # Mapping of Google Keep color labels to hex values for inline styling.
@@ -92,6 +94,8 @@ COLOR_MAP = {
     "PINK": "#f8bbd0",
     "BROWN": "#d7ccc8",
 }
+
+AttachmentRef = Tuple[str, str, str]
 
 # --- Core Logic ---
 
@@ -134,6 +138,21 @@ def get_safe_filename(title: str, output_dir: str, created_usec: int) -> str:
         counter += 1
         filename = f"{base_name}-{counter}.md"
 
+    return filename
+
+
+def get_unique_attachment_name(
+    original: str, target_dir: str, used_names: Set[str]
+) -> str:
+    """Generate a filesystem-safe filename for attachments without collisions."""
+    base, ext = os.path.splitext(original)
+    base = slugify(base) or "attachment"
+    filename = f"{base}{ext}"
+    counter = 1
+    while filename in used_names or os.path.exists(os.path.join(target_dir, filename)):
+        counter += 1
+        filename = f"{base}-{counter}{ext}"
+    used_names.add(filename)
     return filename
 
 
@@ -196,6 +215,8 @@ def parse_note_json(filepath: str) -> Optional[Note]:
     # Attachments (metadata only)
     attachments = data.get("attachments", [])
 
+    annotations = data.get("annotations", [])
+
     return Note(
         title=title,
         content=content,
@@ -208,37 +229,13 @@ def parse_note_json(filepath: str) -> Optional[Note]:
         labels=labels,
         color=color,
         attachments=attachments,
+        annotations=annotations,
     )
 
 
-def note_to_markdown(note: Note) -> str:
-    """
-    Converts a Note object to a Markdown string with YAML frontmatter.
-    """
-    # Frontmatter
-    lines = ["---"]
-    lines.append(f"created: {parse_timestamp(note.created_usec)}")
-    lines.append(f"updated: {parse_timestamp(note.updated_usec)}")
-    lines.append(f"pinned: {str(note.is_pinned).lower()}")
-    lines.append(f"archived: {str(note.is_archived).lower()}")
-    lines.append(f"trashed: {str(note.is_trashed).lower()}")
-    lines.append(f"color: {note.color}")
-
-    if note.labels:
-        lines.append("labels:")
-        for label in note.labels:
-            lines.append(f"  - {label}")
-
-    if note.attachments:
-        lines.append("attachments:")
-        for att in note.attachments:
-            # Just listing attachment info, not linking files as we don't copy them
-            filename = att.get("filePath", "unknown")
-            mimetype = att.get("mimetype", "unknown")
-            lines.append(f"  - {filename} ({mimetype})")
-
-    lines.append("---\n")
-
+def note_to_markdown(note: Note, attachment_refs: List[AttachmentRef]) -> str:
+    """Render a note as Markdown with optional HTML wrappers."""
+    lines: List[str] = []
     title_header = note.title if note.title else "Untitled Note"
     lines.append(f"# {title_header}\n")
 
@@ -254,23 +251,72 @@ def note_to_markdown(note: Note) -> str:
             body_lines.append(f"- [{mark}] {text}")
         body_lines.append("")
 
+    if body_lines and body_lines[-1] == "":
+        body_lines.pop()
+
+    if note.labels:
+        if body_lines:
+            body_lines.append("")
+        body_lines.append("Labels: " + ", ".join(note.labels))
+
+    if attachment_refs:
+        if body_lines:
+            body_lines.append("")
+        body_lines.append("Attachments:")
+        for original_name, rel_path, mimetype in attachment_refs:
+            if mimetype.startswith("image/"):
+                body_lines.append(f"![{original_name}]({rel_path})")
+            else:
+                body_lines.append(f"[{original_name}]({rel_path})")
+
+    if note.annotations:
+        link_lines = []
+        for ann in note.annotations:
+            url = ann.get("url")
+            if not url:
+                continue
+            link_text = ann.get("title") or ann.get("description") or url
+            description = ann.get("description")
+            formatted = f"- [{link_text}]({url})"
+            if description and description != link_text:
+                formatted += f" — {description}"
+            link_lines.append(formatted)
+        if link_lines:
+            if body_lines:
+                body_lines.append("")
+            body_lines.append("Links:")
+            body_lines.extend(link_lines)
+
+    timestamp_source = note.updated_usec or note.created_usec
+    timestamp_label = "Updated" if note.updated_usec else "Created"
+    timestamp_text = parse_timestamp(timestamp_source)
+    footer = (
+        '<div style="font-size: 0.8em; color: #555; margin-top: 12px;">'
+        f"{timestamp_label}: {timestamp_text}"
+        "</div>"
+    )
+
     # Remove trailing blank line if present
     while body_lines and body_lines[-1] == "":
         body_lines.pop()
 
-    if body_lines:
-        color_label = (note.color or "DEFAULT").upper()
-        if color_label != "DEFAULT" and color_label in COLOR_MAP:
-            color_hex = COLOR_MAP[color_label]
-            lines.append(
-                '<div class="keep-note" style="background-color: '
-                f"{color_hex}; color: black; padding: 16px; border-radius: 8px; "
-                'margin-bottom: 16px;">'
-            )
+    color_label = (note.color or "DEFAULT").upper()
+    if color_label != "DEFAULT" and color_label in COLOR_MAP:
+        color_hex = COLOR_MAP[color_label]
+        lines.append(
+            '<div class="keep-note" style="background-color: '
+            f"{color_hex}; color: black; padding: 16px; border-radius: 8px; "
+            'margin-bottom: 16px;">'
+        )
+        lines.append("")
+        if body_lines:
             lines.extend(body_lines)
-            lines.append("</div>")
-        else:
+        lines.append(footer)
+        lines.append("</div>")
+    else:
+        if body_lines:
             lines.extend(body_lines)
+        lines.append(footer)
 
     return "\n".join(lines).strip() + "\n"
 
@@ -363,14 +409,66 @@ def main():
 
     notes_to_export.sort(
         key=lambda pair: (
-            0 if pair[0].is_pinned else 1,
-            -int(pair[0].updated_usec or 0),
+            1 if pair[0].is_pinned else 0,
+            int(pair[0].updated_usec or 0),
         )
     )
 
+    attachment_name_cache: Set[str] = set()
+    resources_dir = os.path.join(output_dir, "resources")
+    resources_ready = False
+
     for note, filepath in notes_to_export:
+        attachment_refs: List[AttachmentRef] = []
+        if note.attachments:
+            for att in note.attachments:
+                file_rel = att.get("filePath")
+                if not file_rel:
+                    continue
+                source_file = os.path.join(os.path.dirname(filepath), file_rel)
+                if not os.path.isfile(source_file):
+                    if args.verbose:
+                        print(f"  -> Attachment missing: {file_rel}")
+                    continue
+                dest_name = get_unique_attachment_name(
+                    file_rel, resources_dir, attachment_name_cache
+                )
+                rel_path = os.path.join("resources", dest_name)
+                if args.dry_run:
+                    if args.verbose:
+                        print(
+                            f"  -> [Dry Run] Would copy attachment "
+                            f"{file_rel} -> {rel_path}"
+                        )
+                else:
+                    if not resources_ready:
+                        try:
+                            os.makedirs(resources_dir, exist_ok=True)
+                        except OSError as e:
+                            print(
+                                f"Error creating resources directory '{resources_dir}': {e}",
+                                file=sys.stderr,
+                            )
+                            stats["errors"] += 1
+                            attachment_refs = []
+                            break
+                        resources_ready = True
+                    dest_path = os.path.join(resources_dir, dest_name)
+                    try:
+                        shutil.copy2(source_file, dest_path)
+                    except OSError as e:
+                        print(
+                            f"Error copying attachment '{source_file}': {e}",
+                            file=sys.stderr,
+                        )
+                        stats["errors"] += 1
+                        continue
+                attachment_refs.append(
+                    (os.path.basename(file_rel), rel_path, att.get("mimetype", ""))
+                )
+
         # Generate Markdown
-        md_content = note_to_markdown(note)
+        md_content = note_to_markdown(note, attachment_refs)
 
         # Determine filename
         safe_filename = get_safe_filename(note.title, output_dir, note.created_usec)
