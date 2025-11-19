@@ -43,8 +43,7 @@ class HelpWindow(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
         
         # Scrollable text area
-        text_area = QtWidgets.QTextEdit()
-        text_area.setReadOnly(True)
+        text_area = QtWidgets.QTextBrowser()
         text_area.setOpenExternalLinks(True)  # Enable clicking on links
         text_area.setHtml(self._get_help_text())
         layout.addWidget(text_area)
