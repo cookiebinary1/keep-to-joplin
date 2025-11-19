@@ -2,6 +2,8 @@
 
 A tool to convert Google Keep notes (exported via Google Takeout) into Markdown files suitable for importing into Joplin.
 
+![Keep to Joplin GUI Screenshot](assets/images/screenshot.png)
+
 ## Download
 
 Pre-built executables are available for download from the [Releases](https://github.com/cookiebinary1/keep-to-joplin/releases) page:

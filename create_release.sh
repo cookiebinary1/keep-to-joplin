@@ -56,14 +56,25 @@ if [ -d "dist/keep_to_joplin.app" ]; then
     fi
 fi
 
-# Linux - check for executable (but not if macOS app or Windows exe exists)
-if [ -f "dist/keep_to_joplin" ] && [ ! -d "dist/keep_to_joplin.app" ] && [ ! -f "dist/keep_to_joplin.exe" ]; then
-    # Verify it's actually a Linux executable (if file command is available)
-    IS_LINUX=true
+# Linux - check for executable and verify it's actually a Linux binary
+if [ -f "dist/keep_to_joplin" ]; then
+    # Verify it's actually a Linux executable (not macOS or Windows)
+    IS_LINUX=false
+    
+    # Check if it's NOT a macOS app bundle (we already checked for .app separately)
+    # Check if it's NOT a Windows exe (we already checked for .exe separately)
+    # So if we have keep_to_joplin file, it should be Linux (or macOS binary, but we check with file command)
+    
     if command -v file &> /dev/null; then
-        if ! file "dist/keep_to_joplin" | grep -qE "(ELF|executable|Linux)"; then
-            IS_LINUX=false
+        FILE_TYPE=$(file "dist/keep_to_joplin" 2>/dev/null)
+        # Check if it's an ELF binary (Linux) or contains "Linux" or "executable" but not "Mach-O" (macOS)
+        if echo "$FILE_TYPE" | grep -qE "(ELF|Linux|executable)" && ! echo "$FILE_TYPE" | grep -qE "(Mach-O|macOS|Apple)"; then
+            IS_LINUX=true
         fi
+    else
+        # If file command is not available, assume it's Linux if it's not .app or .exe
+        # This is a fallback - ideally file command should be available
+        IS_LINUX=true
     fi
     
     if [ "$IS_LINUX" = true ]; then
@@ -130,18 +141,60 @@ if [ "$AUTO_RELEASE" = true ]; then
         exit 1
     fi
     
-    echo "Creating GitHub release..."
-    NOTES="${RELEASE_NOTES:-Release ${VERSION}}"
-    if gh release create "${VERSION}" ${ARCHIVE_ARGS} --title "Release ${VERSION}" --notes "${NOTES}"; then
+    # Check if release already exists
+    if gh release view "${VERSION}" &>/dev/null; then
+        echo "Warning: Release ${VERSION} already exists!"
         echo ""
-        echo "✓ GitHub release created successfully!"
-        echo "  https://github.com/cookiebinary1/keep-to-joplin/releases/tag/${VERSION}"
+        echo "Options:"
+        echo "  1. Upload new files to existing release (recommended)"
+        echo "  2. Delete existing release and create new one"
+        echo "  3. Use a different version tag"
+        echo ""
+        echo "Uploading files to existing release..."
+        NOTES="${RELEASE_NOTES:-Release ${VERSION}}"
+        
+        # Upload files to existing release
+        UPLOAD_SUCCESS=true
+        for archive in "${ARCHIVES[@]}"; do
+            if ! gh release upload "${VERSION}" "${archive}" --clobber; then
+                UPLOAD_SUCCESS=false
+                echo "✗ Failed to upload ${archive}"
+            else
+                echo "✓ Uploaded ${archive}"
+            fi
+        done
+        
+        if [ "$UPLOAD_SUCCESS" = true ]; then
+            echo ""
+            echo "✓ Files uploaded to existing release successfully!"
+            echo "  https://github.com/cookiebinary1/keep-to-joplin/releases/tag/${VERSION}"
+            echo ""
+            echo "Note: To update release notes, use:"
+            echo "  gh release edit ${VERSION} --notes '${NOTES}'"
+        else
+            echo ""
+            echo "✗ Some files failed to upload"
+            echo ""
+            echo "To manually upload files:"
+            for archive in "${ARCHIVES[@]}"; do
+                echo "  gh release upload ${VERSION} ${archive} --clobber"
+            done
+            exit 1
+        fi
     else
-        echo ""
-        echo "✗ Failed to create GitHub release"
-        echo "You can try manually:"
-        echo "  gh release create ${VERSION} ${ARCHIVE_ARGS} --title 'Release ${VERSION}' --notes '${NOTES}'"
-        exit 1
+        echo "Creating GitHub release..."
+        NOTES="${RELEASE_NOTES:-Release ${VERSION}}"
+        if gh release create "${VERSION}" ${ARCHIVE_ARGS} --title "Release ${VERSION}" --notes "${NOTES}"; then
+            echo ""
+            echo "✓ GitHub release created successfully!"
+            echo "  https://github.com/cookiebinary1/keep-to-joplin/releases/tag/${VERSION}"
+        else
+            echo ""
+            echo "✗ Failed to create GitHub release"
+            echo "You can try manually:"
+            echo "  gh release create ${VERSION} ${ARCHIVE_ARGS} --title 'Release ${VERSION}' --notes '${NOTES}'"
+            exit 1
+        fi
     fi
 else
     echo "To create a GitHub release:"
