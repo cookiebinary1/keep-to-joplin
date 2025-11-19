@@ -322,9 +322,9 @@ def note_to_markdown(
     timestamp_label = "Updated" if note.updated_usec else "Created"
     timestamp_text = parse_timestamp(timestamp_source)
     footer = (
-        '<div style="font-size: 0.8em; color: #555; margin-top: 12px;">'
+        '<small style="color: #555;">'
         f"{timestamp_label}: {timestamp_text}"
-        "</div>"
+        "</small>"
     )
 
     # Remove trailing blank line if present
