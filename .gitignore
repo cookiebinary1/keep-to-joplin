@@ -1,4 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# PyInstaller
+build/
+dist/
+*.egg-info/
+
+# Release archives
+*.zip
+*.tar.gz
+*.dmg
+
+# User data
 Takeout/
-takeout*
-joplin_out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+.rebase_script.sh
 
