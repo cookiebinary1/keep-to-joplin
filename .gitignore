@@ -2,3 +2,12 @@ Takeout/
 takeout*
 joplin_out/
 
+# Build artifacts
+build/
+dist/
+*.pyc
+__pycache__/
+.venv/
+venv/
+*.spec.bak
+

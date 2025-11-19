@@ -1,3 +1,0 @@
-([('keep_to_joplin',
-   '/Users/cookie/src/keep-to-joplin/dist/keep_to_joplin',
-   'EXECUTABLE')],)
