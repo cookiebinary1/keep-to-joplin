@@ -29,7 +29,7 @@ import shutil
 import sys
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import List, Optional, Set, Tuple
+from typing import Callable, List, Optional, Set, Tuple
 
 # --- HTML Stripper ---
 
@@ -112,32 +112,53 @@ def parse_timestamp(usec: int) -> str:
 
 def slugify(value: str) -> str:
     """
-    Normalizes string, converts to lowercase, removes non-alpha characters,
-    and converts spaces to hyphens.
+    Normalizes string for attachments: lowercase, removes unsafe characters,
+    and converts spaces/hyphens to single hyphen.
     """
     value = str(value)
-    # Replace unsafe characters with nothing or space
     value = re.sub(r"[^\w\s-]", "", value).strip().lower()
-    # Replace spaces with hyphens
     value = re.sub(r"[-\s]+", "-", value)
     return value
 
 
+def sanitize_note_filename(value: str) -> str:
+    """Keep spaces and case, but drop path separators and illegal characters."""
+    value = str(value).strip()
+    if not value:
+        return ""
+    cleaned = re.sub(r'[\\/:*"<>|]+', "", value)
+    cleaned = cleaned.rstrip(". ")
+    return cleaned
+
+
 def get_safe_filename(title: str, output_dir: str, created_usec: int) -> str:
     """
-    Generates a unique filename for the note.
+    Generates a unique filename for the note, preserving case/spaces.
     """
-    base_name = slugify(title)
+    base_name = sanitize_note_filename(title)
     if not base_name:
         base_name = f"note-{created_usec}"
 
     filename = f"{base_name}.md"
     counter = 1
-
     while os.path.exists(os.path.join(output_dir, filename)):
         counter += 1
-        filename = f"{base_name}-{counter}.md"
+        filename = f"{base_name} ({counter}).md"
+    return filename
 
+
+def get_unique_attachment_name(
+    original: str, target_dir: str, used_names: Set[str]
+) -> str:
+    """Generate a filename for attachments that avoids collisions."""
+    base, ext = os.path.splitext(original)
+    base = slugify(base) or "attachment"
+    filename = f"{base}{ext}"
+    counter = 1
+    while filename in used_names or os.path.exists(os.path.join(target_dir, filename)):
+        counter += 1
+        filename = f"{base}-{counter}{ext}"
+    used_names.add(filename)
     return filename
 
 
@@ -233,22 +254,32 @@ def parse_note_json(filepath: str) -> Optional[Note]:
     )
 
 
-def note_to_markdown(note: Note, attachment_refs: List[AttachmentRef]) -> str:
+def note_to_markdown(
+    note: Note, attachment_refs: Optional[List[AttachmentRef]] = None
+) -> str:
     """Render a note as Markdown with optional HTML wrappers."""
     lines: List[str] = []
-    title_header = note.title if note.title else "Untitled Note"
-    lines.append(f"# {title_header}\n")
 
     body_lines: List[str] = []
+
+    attachment_refs = attachment_refs or []
 
     if note.content:
         body_lines.append(note.content.rstrip())
         body_lines.append("")
 
+    color_label = (note.color or "DEFAULT").upper()
+    has_colored_background = color_label != "DEFAULT" and color_label in COLOR_MAP
+
     if note.items:
         for text, checked in note.items:
             mark = "x" if checked else " "
-            body_lines.append(f"- [{mark}] {text}")
+            if has_colored_background:
+                # Use HTML with black color for checkboxes when background is colored
+                checkbox_html = f'<span style="color: black;">- [{mark}]</span> {text}'
+                body_lines.append(checkbox_html)
+            else:
+                body_lines.append(f"- [{mark}] {text}")
         body_lines.append("")
 
     if body_lines and body_lines[-1] == "":
@@ -300,8 +331,7 @@ def note_to_markdown(note: Note, attachment_refs: List[AttachmentRef]) -> str:
     while body_lines and body_lines[-1] == "":
         body_lines.pop()
 
-    color_label = (note.color or "DEFAULT").upper()
-    if color_label != "DEFAULT" and color_label in COLOR_MAP:
+    if has_colored_background:
         color_hex = COLOR_MAP[color_label]
         lines.append(
             '<div class="keep-note" style="background-color: '
@@ -319,6 +349,146 @@ def note_to_markdown(note: Note, attachment_refs: List[AttachmentRef]) -> str:
         lines.append(footer)
 
     return "\n".join(lines).strip() + "\n"
+
+
+def convert_keep_notes(
+    input_dir: str,
+    output_dir: str,
+    *,
+    dry_run: bool = False,
+    verbose: bool = False,
+    include_trashed: bool = False,
+    include_archived: bool = False,
+    log_callback: Optional[Callable[[str], None]] = None,
+) -> dict:
+    """
+    Convert Google Keep JSON notes from input_dir into Markdown files under output_dir.
+    """
+
+    def log(message: str) -> None:
+        if log_callback:
+            log_callback(message)
+        elif verbose:
+            print(message)
+
+    if not os.path.isdir(input_dir):
+        raise FileNotFoundError(f"Input directory '{input_dir}' does not exist.")
+
+    if not dry_run:
+        os.makedirs(output_dir, exist_ok=True)
+
+    stats = {
+        "processed": 0,
+        "exported": 0,
+        "skipped_trashed": 0,
+        "skipped_archived": 0,
+        "skipped_invalid": 0,
+        "errors": 0,
+    }
+
+    log(f"Scanning '{input_dir}'...")
+
+    notes_to_export: List[Tuple[Note, str]] = []
+
+    for root, _, files in os.walk(input_dir):
+        for file in files:
+            if not file.lower().endswith(".json"):
+                continue
+
+            stats["processed"] += 1
+            filepath = os.path.join(root, file)
+            log(f"Processing: {file}")
+
+            note = parse_note_json(filepath)
+            if not note:
+                stats["skipped_invalid"] += 1
+                log("  -> Invalid or empty JSON")
+                continue
+
+            if note.is_trashed and not include_trashed:
+                stats["skipped_trashed"] += 1
+                log("  -> Skipped (Trashed)")
+                continue
+
+            if note.is_archived and not include_archived:
+                stats["skipped_archived"] += 1
+                log("  -> Skipped (Archived)")
+                continue
+
+            notes_to_export.append((note, filepath))
+
+    notes_to_export.sort(
+        key=lambda pair: (
+            1 if pair[0].is_pinned else 0,
+            int(pair[0].updated_usec or 0),
+        )
+    )
+
+    resources_dir = os.path.join(output_dir, "resources")
+    resources_ready = False
+    used_attachment_names: Set[str] = set()
+
+    for note, filepath in notes_to_export:
+        attachment_refs: List[AttachmentRef] = []
+
+        if note.attachments:
+            for att in note.attachments:
+                file_rel = att.get("filePath")
+                if not file_rel:
+                    continue
+                source_file = os.path.join(os.path.dirname(filepath), file_rel)
+                if not os.path.isfile(source_file):
+                    log(f"  -> Attachment missing: {file_rel}")
+                    continue
+
+                dest_name = get_unique_attachment_name(
+                    file_rel, resources_dir, used_attachment_names
+                )
+                rel_path = os.path.join("resources", dest_name)
+
+                if dry_run:
+                    log(
+                        f"  -> [Dry Run] Would copy attachment {file_rel} -> {rel_path}"
+                    )
+                else:
+                    if not resources_ready:
+                        os.makedirs(resources_dir, exist_ok=True)
+                        resources_ready = True
+                    dest_path = os.path.join(resources_dir, dest_name)
+                    try:
+                        shutil.copy2(source_file, dest_path)
+                        log(f"  -> Copied attachment {file_rel} -> {rel_path}")
+                    except OSError as e:
+                        log(f"  -> Attachment copy failed: {e}")
+                        stats["errors"] += 1
+                        continue
+
+                attachment_refs.append(
+                    (os.path.basename(file_rel), rel_path, att.get("mimetype", ""))
+                )
+
+        md_content = note_to_markdown(note, attachment_refs)
+
+        safe_filename = get_safe_filename(note.title, output_dir, note.created_usec)
+        output_path = os.path.join(output_dir, safe_filename)
+
+        if dry_run:
+            log(
+                f"[Dry Run] Would write: {output_path} (from {os.path.basename(filepath)})"
+            )
+        else:
+            try:
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(md_content)
+                log(f"  -> Wrote: {safe_filename}")
+            except OSError as e:
+                log(f"Error writing {output_path}: {e}")
+                stats["errors"] += 1
+                continue
+
+        stats["exported"] += 1
+
+    return stats
 
 
 def main():
@@ -346,150 +516,21 @@ def main():
 
     args = parser.parse_args()
 
-    input_dir = args.input
-    output_dir = args.output
+    print(f"Scanning '{args.input}'...")
 
-    if not os.path.isdir(input_dir):
-        print(f"Error: Input directory '{input_dir}' does not exist.", file=sys.stderr)
-        sys.exit(1)
+    log_callback = print if args.dry_run or args.verbose else None
 
-    if not args.dry_run:
-        try:
-            os.makedirs(output_dir, exist_ok=True)
-        except OSError as e:
-            print(
-                f"Error: Could not create output directory '{output_dir}': {e}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    stats = {
-        "processed": 0,
-        "exported": 0,
-        "skipped_trashed": 0,
-        "skipped_archived": 0,
-        "skipped_invalid": 0,
-        "errors": 0,
-    }
-
-    print(f"Scanning '{input_dir}'...")
-
-    notes_to_export: List[Tuple[Note, str]] = []
-
-    for root, _, files in os.walk(input_dir):
-        for file in files:
-            if not file.lower().endswith(".json"):
-                continue
-
-            stats["processed"] += 1
-            filepath = os.path.join(root, file)
-
-            if args.verbose:
-                print(f"Processing: {file}")
-
-            note = parse_note_json(filepath)
-
-            if not note:
-                stats["skipped_invalid"] += 1
-                if args.verbose:
-                    print(f"  -> Invalid or empty JSON")
-                continue
-            if note.is_trashed:
-                stats["skipped_trashed"] += 1
-                if args.verbose:
-                    print(f"  -> Skipped (Trashed)")
-                continue
-            if note.is_archived:
-                stats["skipped_archived"] += 1
-                if args.verbose:
-                    print(f"  -> Skipped (Archived)")
-                continue
-
-            notes_to_export.append((note, filepath))
-
-    notes_to_export.sort(
-        key=lambda pair: (
-            1 if pair[0].is_pinned else 0,
-            int(pair[0].updated_usec or 0),
+    try:
+        stats = convert_keep_notes(
+            args.input,
+            args.output,
+            dry_run=args.dry_run,
+            verbose=args.verbose,
+            log_callback=log_callback,
         )
-    )
-
-    attachment_name_cache: Set[str] = set()
-    resources_dir = os.path.join(output_dir, "resources")
-    resources_ready = False
-
-    for note, filepath in notes_to_export:
-        attachment_refs: List[AttachmentRef] = []
-        if note.attachments:
-            for att in note.attachments:
-                file_rel = att.get("filePath")
-                if not file_rel:
-                    continue
-                source_file = os.path.join(os.path.dirname(filepath), file_rel)
-                if not os.path.isfile(source_file):
-                    if args.verbose:
-                        print(f"  -> Attachment missing: {file_rel}")
-                    continue
-                dest_name = get_unique_attachment_name(
-                    file_rel, resources_dir, attachment_name_cache
-                )
-                rel_path = os.path.join("resources", dest_name)
-                if args.dry_run:
-                    if args.verbose:
-                        print(
-                            f"  -> [Dry Run] Would copy attachment "
-                            f"{file_rel} -> {rel_path}"
-                        )
-                else:
-                    if not resources_ready:
-                        try:
-                            os.makedirs(resources_dir, exist_ok=True)
-                        except OSError as e:
-                            print(
-                                f"Error creating resources directory '{resources_dir}': {e}",
-                                file=sys.stderr,
-                            )
-                            stats["errors"] += 1
-                            attachment_refs = []
-                            break
-                        resources_ready = True
-                    dest_path = os.path.join(resources_dir, dest_name)
-                    try:
-                        shutil.copy2(source_file, dest_path)
-                    except OSError as e:
-                        print(
-                            f"Error copying attachment '{source_file}': {e}",
-                            file=sys.stderr,
-                        )
-                        stats["errors"] += 1
-                        continue
-                attachment_refs.append(
-                    (os.path.basename(file_rel), rel_path, att.get("mimetype", ""))
-                )
-
-        # Generate Markdown
-        md_content = note_to_markdown(note, attachment_refs)
-
-        # Determine filename
-        safe_filename = get_safe_filename(note.title, output_dir, note.created_usec)
-        output_path = os.path.join(output_dir, safe_filename)
-
-        if args.dry_run:
-            print(
-                f"[Dry Run] Would write: {output_path} (from {os.path.basename(filepath)})"
-            )
-        else:
-            try:
-                with open(output_path, "w", encoding="utf-8") as f:
-                    f.write(md_content)
-                if args.verbose:
-                    print(f"  -> Wrote: {safe_filename}")
-            except IOError as e:
-                print(f"Error writing {output_path}: {e}", file=sys.stderr)
-                stats["errors"] += 1
-                continue
-
-        stats["exported"] += 1
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     print("\nSummary")
     print("=======")
@@ -500,7 +541,7 @@ def main():
     print(f"Skipped invalid: {stats['skipped_invalid']}")
     if stats["errors"] > 0:
         print(f"Write errors: {stats['errors']}")
-    print(f"Output directory: {output_dir}")
+    print(f"Output directory: {args.output}")
 
 
 if __name__ == "__main__":

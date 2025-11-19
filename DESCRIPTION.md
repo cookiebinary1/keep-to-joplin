@@ -1,6 +1,6 @@
 # Google Keep to Joplin Converter
 
-A command-line tool to convert Google Keep notes (exported via Google Takeout) into Markdown files suitable for importing into Joplin.
+A tool to convert Google Keep notes (exported via Google Takeout) into Markdown files suitable for importing into Joplin. Available as both a command-line tool and a GUI application.
 
 ## Features
 
@@ -9,22 +9,38 @@ A command-line tool to convert Google Keep notes (exported via Google Takeout) i
 - **Tag Support**: Converts Google Keep labels to Joplin tags (via frontmatter).
 - **Status Handling**: Preserves Pinned, Archived, and Trashed status.
 - **Safe Filenames**: Generates unique, slugified filenames based on note titles.
-- **No Dependencies**: Written in pure Python 3 using only the standard library.
+- **No Dependencies**: Written in pure Python 3 using only the standard library (CLI version).
+- **Standalone Executable**: GUI version available as a standalone macOS executable (no Python required).
 
 ## Prerequisites
 
+**For CLI version:**
 - Python 3.8 or higher.
+- A Google Takeout export containing Google Keep data.
+
+**For GUI executable:**
+- macOS (the standalone executable includes everything needed).
 - A Google Takeout export containing Google Keep data.
 
 ## Usage
 
 1.  **Export Data**: Download your Google Keep data from [Google Takeout](https://takeout.google.com/).
 2.  **Extract**: Unzip the downloaded file. You should see a `Takeout/Keep` directory containing `.json` files.
-3.  **Run the Script**:
+3.  **Run the Tool**:
 
+**Command-line version:**
 ```bash
 python3 keep_to_joplin.py --input /path/to/Takeout/Keep --output /path/to/output_md
 ```
+
+**GUI version (standalone executable):**
+```bash
+./dist/keep_to_joplin
+```
+Then use the graphical interface to select input and output directories.
+
+**Building the standalone executable:**
+See [BUILD.md](BUILD.md) for instructions on building the standalone GUI executable.
 
 ### Options
 
