@@ -20,9 +20,11 @@ source .venv/bin/activate
 echo "Installing/upgrading dependencies..."
 pip install --upgrade pyinstaller PyQt6 > /dev/null 2>&1
 
-# Clean previous builds
-echo "Cleaning previous builds..."
-rm -rf build/ dist/ *.spec
+# Clean previous builds (only Linux-specific files)
+echo "Cleaning previous Linux builds..."
+rm -rf build/
+rm -f dist/keep_to_joplin
+rm -f *.spec
 
 # Build the executable
 echo "Building standalone executable for Linux..."

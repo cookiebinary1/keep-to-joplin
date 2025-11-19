@@ -20,9 +20,11 @@ source .venv/bin/activate
 echo "Installing/upgrading dependencies..."
 pip install --upgrade pyinstaller PyQt6 > /dev/null 2>&1
 
-# Clean previous builds
-echo "Cleaning previous builds..."
-rm -rf build/ dist/ *.spec
+# Clean previous builds (only macOS-specific files)
+echo "Cleaning previous macOS builds..."
+rm -rf build/
+rm -rf dist/keep_to_joplin.app
+rm -f *.spec
 
 # Build the executable
 echo "Building standalone executable..."

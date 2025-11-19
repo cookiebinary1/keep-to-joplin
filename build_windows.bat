@@ -18,10 +18,10 @@ REM Install/upgrade dependencies
 echo Installing/upgrading dependencies...
 pip install --upgrade pyinstaller PyQt6 >nul 2>&1
 
-REM Clean previous builds
-echo Cleaning previous builds...
+REM Clean previous builds (only Windows-specific files)
+echo Cleaning previous Windows builds...
 if exist build rmdir /s /q build
-if exist dist rmdir /s /q dist
+if exist dist\keep_to_joplin.exe del /q dist\keep_to_joplin.exe
 del /q *.spec 2>nul
 
 REM Build the executable
