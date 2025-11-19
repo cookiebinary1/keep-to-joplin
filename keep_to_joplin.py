@@ -276,7 +276,7 @@ def note_to_markdown(
             mark = "x" if checked else " "
             if has_colored_background:
                 # Use HTML with black color for checkboxes when background is colored
-                checkbox_html = f'<span style="color: black;">- [{mark}]</span> {text}'
+                checkbox_html = f'- [{mark}] {text}'
                 body_lines.append(checkbox_html)
             else:
                 body_lines.append(f"- [{mark}] {text}")
