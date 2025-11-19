@@ -2,6 +2,15 @@
 
 A tool to convert Google Keep notes (exported via Google Takeout) into Markdown files suitable for importing into Joplin.
 
+## Download
+
+Pre-built executables are available for download from the [Releases](https://github.com/cookiebinary1/keep-to-joplin/releases) page:
+
+- **[Latest Release](https://github.com/cookiebinary1/keep-to-joplin/releases/latest)** - Download the latest version
+- **macOS**: `keep-to-joplin-vX.X.X-macos.zip`
+- **Linux**: `keep-to-joplin-vX.X.X-linux.zip`
+- **Windows**: `keep-to-joplin-vX.X.X-windows.zip`
+
 ## Why Migrate from Google Keep to Joplin?
 
 Migrating from Google Keep to [Joplin](https://joplinapp.org/) offers several significant advantages:
@@ -13,15 +22,6 @@ Migrating from Google Keep to [Joplin](https://joplinapp.org/) offers several si
 - **Offline-First**: Works completely offline, with sync as an optional feature
 - **Extensibility**: Plugin system and API support for customization and automation
 - **No Vendor Lock-in**: Your notes are stored in standard Markdown format, making it easy to export or migrate in the future
-
-## Download
-
-Pre-built executables are available for download from the [Releases](https://github.com/cookiebinary1/keep-to-joplin/releases) page:
-
-- **[Latest Release](https://github.com/cookiebinary1/keep-to-joplin/releases/latest)** - Download the latest version
-- **macOS**: `keep-to-joplin-vX.X.X-macos.zip`
-- **Linux**: `keep-to-joplin-vX.X.X-linux.zip`
-- **Windows**: `keep-to-joplin-vX.X.X-windows.zip`
 
 ## Quick Start
 
